@@ -1,0 +1,10 @@
+node_modules/
+dist/
+playwright-report/
+test-results/
+*.log
+.DS_Store
+# User-provided reference photos and local screenshots are never source assets.
+*.jpg
+*.jpeg
+*.png
