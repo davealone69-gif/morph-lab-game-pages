@@ -8,3 +8,13 @@ test-results/
 *.jpg
 *.jpeg
 *.png
+!assets/icon-only.png
+!assets/icon-foreground.png
+!assets/splash.png
+!resources/icon.png
+!android/app/src/main/res/**/*.png
+android/.gradle/
+android/local.properties
+android/**/build/
+android/.idea/
+*.iml

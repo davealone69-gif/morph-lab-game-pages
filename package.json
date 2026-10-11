@@ -7,12 +7,17 @@
     "build": "vite build && node scripts/generate-sw.mjs",
     "preview": "vite preview --host 0.0.0.0",
     "test:profile": "vitest run tests/profile.test.ts tests/save.test.ts",
-    "smoke": "node smoke.mjs"
+    "smoke": "node smoke.mjs",
+    "android:sync": "MORPH_LAB_BASE=/ pnpm build && cap sync android",
+    "android:debug": "pnpm android:sync && cd android && ./gradlew assembleDebug"
   },
   "dependencies": {
+    "@capacitor/android": "8.5.3",
+    "@capacitor/core": "8.5.3",
     "three": "^0.180.0"
   },
   "devDependencies": {
+    "@capacitor/cli": "8.5.3",
     "@types/three": "^0.180.0",
     "playwright": "^1.56.0",
     "typescript": "^5.9.0",
