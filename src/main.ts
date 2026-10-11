@@ -10,7 +10,7 @@ let activeTab = 'lab'
 let running = false
 let faceTexture: THREE.Texture | undefined
 let portraitData = ''
-let cameraYaw = 0.65
+let cameraYaw = 0.2
 let cameraPitch = 0.22
 let dashUntil = 0
 let lastFrame = performance.now()
@@ -117,9 +117,9 @@ function buildAvatar(): void {
   const hair = new THREE.Mesh(new THREE.SphereGeometry(0.54, 24, 18, 0, Math.PI * 2, 0, Math.PI * 0.72), hairMat); hair.position.set(0, 2.45, 0.02); hair.scale.set(1.03, 1.12, 0.98); avatarGroup.add(hair)
   if (profile.hair === 'twin-tails') { for (const x of [-0.46, 0.46]) { const tail = new THREE.Mesh(new THREE.SphereGeometry(0.25, 16, 12), hairMat); tail.position.set(x, 2.48, 0.02); tail.scale.set(0.72, 1.55, 0.72); avatarGroup.add(tail) } }
   if (profile.hair === 'crown') { for (let i = 0; i < 7; i += 1) { const thorn = new THREE.Mesh(new THREE.ConeGeometry(0.045, 0.38, 6), hairMat); const a = (i / 7) * Math.PI * 2; thorn.position.set(Math.cos(a) * 0.34, 2.8, Math.sin(a) * 0.16); thorn.rotation.z = Math.cos(a) * 0.5; thorn.rotation.x = Math.sin(a) * 0.5; avatarGroup.add(thorn) } }
-  const face = new THREE.Mesh(new THREE.CircleGeometry(0.36, 32), new THREE.MeshBasicMaterial({ map: faceTexture ?? syntheticFace, transparent: true, depthWrite: false })); face.position.set(0, 2.32, -0.58); face.scale.set(1, 1.2, 1); face.rotation.y = Math.PI; avatarGroup.add(face)
+  const face = new THREE.Mesh(new THREE.CircleGeometry(0.36, 32), new THREE.MeshBasicMaterial({ map: faceTexture ?? syntheticFace, transparent: true, depthWrite: false })); face.position.set(0, 2.32, 0.58); face.scale.set(1, 1.2, 1); avatarGroup.add(face)
   const collar = new THREE.Mesh(new THREE.TorusGeometry(0.38, 0.055, 8, 32), accentMat); collar.rotation.x = Math.PI / 2; collar.position.set(0, 1.84, -0.04); avatarGroup.add(collar)
-  const emblem = new THREE.Mesh(new THREE.OctahedronGeometry(0.12), accentMat); emblem.position.set(0, 1.42, -0.54); avatarGroup.add(emblem)
+  const emblem = new THREE.Mesh(new THREE.OctahedronGeometry(0.12), accentMat); emblem.position.set(0, 1.42, 0.54); avatarGroup.add(emblem)
   avatarAura = new THREE.Mesh(new THREE.TorusGeometry(0.9, 0.018, 8, 64), new THREE.MeshBasicMaterial({ color: outfit.accent, transparent: true, opacity: 0.78 })); avatarAura.rotation.x = Math.PI / 2; avatarAura.position.y = 0.04; avatarGroup.add(avatarAura)
   avatarGroup.traverse(object => { if (object instanceof THREE.Mesh) { object.castShadow = true; object.receiveShadow = true } })
 }
@@ -207,7 +207,48 @@ function renderSettings(): string {
 function renderTab(tab = activeTab): void { activeTab = tab; const content = document.getElementById('screen-content'); if (!content) return; content.innerHTML = tab === 'lab' ? renderLab() : tab === 'world' ? renderWorlds() : tab === 'wardrobe' ? renderWardrobe() : tab === 'quests' ? renderQuests() : renderSettings(); document.querySelectorAll<HTMLElement>('[data-action="tab"]').forEach(button => button.classList.toggle('active', button.dataset.tab === activeTab)) }
 
 function applyMorph(): void { const name = (document.getElementById('name-input') as HTMLInputElement | null)?.value.trim().toUpperCase(); const personality = (document.getElementById('personality-input') as HTMLSelectElement | null)?.value as Personality | undefined; updateProfile({ name: name || 'NIGHTSHADE', personality: personality ?? profile.personality }, 'Avatar morphed · ready for exploration'); buildAvatar(); updateHUD() }
-function handleFace(file: File): void { const url = URL.createObjectURL(file); const image = new Image(); image.onload = () => { const c = document.createElement('canvas'); c.width = c.height = 256; const ctx = c.getContext('2d')!; const crop = Math.min(image.naturalWidth, image.naturalHeight * 0.72); const sx = (image.naturalWidth - crop) / 2; const sy = Math.max(0, image.naturalHeight * 0.02); ctx.drawImage(image, sx, sy, crop, Math.min(crop, image.naturalHeight - sy), 0, 0, 256, 256); faceTexture?.dispose(); faceTexture = new THREE.CanvasTexture(c); faceTexture.colorSpace = THREE.SRGBColorSpace; portraitData = c.toDataURL('image/jpeg', 0.84); const portrait = document.getElementById('portrait') as HTMLImageElement | null; if (portrait) { portrait.src = portraitData; portrait.classList.add('visible') }; document.getElementById('portrait-placeholder')?.classList.add('hidden'); buildAvatar(); announce('Local reference mapped · held in memory only'); URL.revokeObjectURL(url) }; image.src = url }
+function handleFace(file: File): void {
+  if (file.type && !file.type.startsWith('image/')) { announce('Choose an image file.'); return }
+  const url = URL.createObjectURL(file)
+  const image = new Image()
+  image.onload = () => {
+    try {
+      if (!image.naturalWidth || !image.naturalHeight) throw new Error('Empty image')
+      const c = document.createElement('canvas'); c.width = c.height = 256
+      const ctx = c.getContext('2d')
+      if (!ctx) throw new Error('Canvas unavailable')
+      const crop = Math.min(image.naturalWidth, image.naturalHeight * 0.72)
+      const sx = (image.naturalWidth - crop) / 2
+      const sy = Math.max(0, image.naturalHeight * 0.02)
+      ctx.drawImage(image, sx, sy, crop, Math.min(crop, image.naturalHeight - sy), 0, 0, 256, 256)
+      const nextPortraitData = c.toDataURL('image/jpeg', 0.84)
+      const nextFaceTexture = new THREE.CanvasTexture(c)
+      nextFaceTexture.colorSpace = THREE.SRGBColorSpace
+      faceTexture?.dispose()
+      faceTexture = nextFaceTexture
+      portraitData = nextPortraitData
+      const portrait = document.getElementById('portrait') as HTMLImageElement | null
+      if (portrait) { portrait.src = portraitData; portrait.classList.add('visible') }
+      document.getElementById('portrait-placeholder')?.classList.add('hidden')
+      buildAvatar()
+      announce('Photo mapped as a 2D face texture · held in memory only')
+    } catch {
+      announce('Could not read that image. Try a JPG or PNG.')
+    } finally {
+      URL.revokeObjectURL(url)
+    }
+  }
+  image.onerror = () => { URL.revokeObjectURL(url); announce('Could not read that image. Try a JPG or PNG.') }
+  image.src = url
+}
+function clearFaceReference(): void {
+  faceTexture?.dispose()
+  faceTexture = undefined
+  portraitData = ''
+  const portrait = document.getElementById('portrait') as HTMLImageElement | null
+  if (portrait) { portrait.removeAttribute('src'); portrait.classList.remove('visible') }
+  document.getElementById('portrait-placeholder')?.classList.remove('hidden')
+}
 function changeWorld(id: WorldId): void { profile.currentWorld = id; if (!profile.visitedWorlds.includes(id)) profile.visitedWorlds.push(id); profile.weather = WORLD_META[id].defaultWeather; checkMilestones(); saveProfile(); buildWorld(); avatarGroup.position.set(0, 0, 0); announce(`Entered ${WORLD_META[id].name}`); renderTab('world') }
 function chooseOutfit(id: OutfitId): void { profile.outfit = id; const marker = `outfit:${id}`; if (!profile.collectibles.includes(marker)) profile.collectibles.push(marker); checkMilestones(); saveProfile(); buildAvatar(); updateHUD(); renderTab('wardrobe'); announce(`${OUTFITS[id].label} equipped`) }
 function beginPlay(): void { running = true; setText('mode-pill', 'EXPLORATION'); setText('play-label', 'PAUSE WORLD'); setText('footer-message', 'is exploring.'); document.body.classList.add('playing'); profile.seenTutorial = true; saveProfile(); announce('Explore freely · collect shards and relics') }
@@ -232,14 +273,14 @@ root.addEventListener('click', event => {
   else if (action === 'expression') { profile.expression = target.dataset.value as Expression; saveProfile(); buildAvatar(); renderTab('wardrobe'); updateHUD() }
   else if (action === 'cycle-time') cycleTime()
   else if (action === 'save-now') { saveProfile(); announce('Profile saved locally') }
-  else if (action === 'reset-profile') { if (window.confirm('Reset local progression and wardrobe choices?')) { store.reset(); profile = store.data; faceTexture?.dispose(); faceTexture = undefined; portraitData = ''; buildAvatar(); buildWorld(); renderTab('lab'); updateHUD(); announce('Local profile reset') } }
+  else if (action === 'reset-profile') { if (window.confirm('Reset local progression and wardrobe choices?')) { store.reset(); profile = store.data; clearFaceReference(); buildAvatar(); buildWorld(); renderTab('lab'); updateHUD(); announce('Local profile reset') } }
 })
 root.addEventListener('change', event => {
   const target = event.target as HTMLInputElement | HTMLSelectElement
-  if (target.id === 'image-input' && target.files?.[0]) handleFace(target.files[0])
+  if (target.id === 'image-input' && target instanceof HTMLInputElement) { const file = target.files?.[0]; target.value = ''; if (file) handleFace(file) }
   if (target.id === 'weather-input') { profile.weather = target.value as WeatherId; buildWeather(); saveProfile(); updateWorldUI(); announce(`${target.value[0].toUpperCase()}${target.value.slice(1)} weather engaged`) }
   if (target.id === 'personality-input') { profile.personality = target.value as Personality; saveProfile(); announce(`${PERSONALITIES[profile.personality]} personality selected`) }
-  if (target.dataset.setting) { const key = target.dataset.setting as keyof ProfileData; (profile as unknown as Record<string, unknown>)[key] = target.checked; saveProfile(); if (key === 'lowPower') { renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, target.checked ? 1 : 1.6)); renderer.shadowMap.enabled = !target.checked; buildWeather() }; if (key === 'adultAtmosphere') setText('footer-meta', target.checked ? 'MATURE GOTHIC THEMES · FULLY CLOTHED' : 'ALL-AGES GOTHIC THEMES · FULLY CLOTHED'); if (key === 'reducedMotion') document.body.classList.toggle('reduced-motion', target.checked); announce('Setting saved locally') }
+  if (target instanceof HTMLInputElement && target.dataset.setting) { const key = target.dataset.setting as keyof ProfileData; const checked = target.checked; (profile as unknown as Record<string, unknown>)[key] = checked; saveProfile(); if (key === 'lowPower') { renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, checked ? 1 : 1.6)); renderer.shadowMap.enabled = !checked; buildWeather() }; if (key === 'adultAtmosphere') setText('footer-meta', checked ? 'MATURE GOTHIC THEMES · FULLY CLOTHED' : 'ALL-AGES GOTHIC THEMES · FULLY CLOTHED'); if (key === 'reducedMotion') document.body.classList.toggle('reduced-motion', checked); announce('Setting saved locally') }
 })
 root.addEventListener('input', event => { const target = event.target as HTMLInputElement; if (target.id === 'name-input') { profile.name = target.value.trim().toUpperCase().slice(0, 18) || 'NIGHTSHADE'; setText('profile-name', profile.name); setText('footer-name', profile.name) } })
 
@@ -247,9 +288,10 @@ window.addEventListener('keydown', event => { if (event.code === 'Escape') { pau
 window.addEventListener('keyup', event => keys.delete(event.code)); window.addEventListener('blur', () => keys.clear())
 const joystick = document.getElementById('joystick')!
 joystick.addEventListener('pointerdown', event => { joystick.setPointerCapture(event.pointerId); const move = (pointerEvent: PointerEvent) => { const rect = joystick.getBoundingClientRect(); const dx = pointerEvent.clientX - (rect.left + rect.width / 2); const dy = pointerEvent.clientY - (rect.top + rect.height / 2); const length = Math.max(1, Math.hypot(dx, dy)); touch.x = Math.max(-1, Math.min(1, dx / 36)); touch.y = Math.max(-1, Math.min(1, dy / 36)); const knob = joystick.querySelector<HTMLElement>('i'); if (knob) knob.style.transform = `translate(${Math.min(36, length) * dx / length}px, ${Math.min(36, length) * dy / length}px)` }; const end = () => { touch.x = 0; touch.y = 0; const knob = joystick.querySelector<HTMLElement>('i'); if (knob) knob.style.transform = ''; window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', end) }; move(event); window.addEventListener('pointermove', move); window.addEventListener('pointerup', end) })
-canvas.addEventListener('pointerdown', event => { if (!running || event.pointerType === 'mouse') return; pointer.active = true; pointer.id = event.pointerId; pointer.x = event.clientX; pointer.y = event.clientY; canvas.setPointerCapture(event.pointerId) })
+canvas.addEventListener('pointerdown', event => { if (!running || (event.pointerType === 'mouse' && event.button !== 0)) return; pointer.active = true; pointer.id = event.pointerId; pointer.x = event.clientX; pointer.y = event.clientY; canvas.setPointerCapture(event.pointerId) })
 canvas.addEventListener('pointermove', event => { if (!pointer.active || event.pointerId !== pointer.id) return; cameraYaw -= (event.clientX - pointer.x) * 0.009; cameraPitch = THREE.MathUtils.clamp(cameraPitch - (event.clientY - pointer.y) * 0.004, -0.1, 0.65); pointer.x = event.clientX; pointer.y = event.clientY })
-canvas.addEventListener('pointerup', () => { pointer.active = false })
+canvas.addEventListener('pointerup', event => { if (event.pointerId === pointer.id) pointer.active = false })
+canvas.addEventListener('pointercancel', event => { if (event.pointerId === pointer.id) pointer.active = false })
 window.addEventListener('resize', () => { renderer.setSize(window.innerWidth, window.innerHeight, false); camera.aspect = window.innerWidth / window.innerHeight; camera.updateProjectionMatrix() })
 
 function updateMovement(dt: number, now: number): void {

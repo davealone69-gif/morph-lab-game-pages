@@ -1,12 +1,13 @@
 {
   "name": "morph-lab",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "vite build && node scripts/generate-sw.mjs",
+    "build": "pnpm typecheck && vite build && node scripts/generate-sw.mjs",
     "preview": "vite preview --host 0.0.0.0",
     "test:profile": "vitest run tests/profile.test.ts tests/save.test.ts",
+    "typecheck": "tsc --noEmit",
     "smoke": "node smoke.mjs",
     "android:sync": "MORPH_LAB_BASE=/ pnpm build && cap sync android",
     "android:debug": "pnpm android:sync && cd android && ./gradlew assembleDebug"
